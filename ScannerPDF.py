@@ -1,6 +1,6 @@
 import fitz  # pip install pymupdf
 
-pdf_path = r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result\6М.GLE-RD-(P0-72-011)-N 2600_004 (RU)_04_изм_2.pdf"
+pdf_path = r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result\Test"
 
 doc = fitz.open(pdf_path)
 page = doc[0]  # Смотрим первую страницу (индекс 0)
