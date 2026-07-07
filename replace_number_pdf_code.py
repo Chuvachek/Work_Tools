@@ -37,12 +37,20 @@ def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_
 
             blocks = page.get_text("dict")["blocks"]
             infos = [(inst, *find_font_info(page, blocks, inst)) for inst in text_instances]
+            saved_infos = []
+
+            for inst, fontsize, color in infos:
+                saved_infos.append((
+                    fitz.Rect(inst),
+                    fontsize,
+                    color
+                ))
 
             for inst, fontsize, color in infos:
                 page.add_redact_annot(inst, fill=(1, 1, 1))
             page.apply_redactions()
 
-            for inst, _, color in infos:
+            for inst, _, color in saved_infos:
                 font_kwargs = {}
                 if font_path and Path(font_path).exists():
                     font_kwargs["fontname"] = Path(font_path).stem
