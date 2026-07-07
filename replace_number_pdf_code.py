@@ -18,10 +18,12 @@ def find_font_info(page, blocks, rect):
     return fontsize, color
 
 
-def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_text: str, font_path: str = None) -> int:
+def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_text: str, font_path: str = None, new_font_size: float = 8) -> int:
     """
     Заменяет все вхождения нескольких старых строк из списка old_texts на new_text в PDF.
-    Принимает необязательный путь к файлу шрифта (.ttf).
+    Принимает необязательный путь к файлу шрифта (.ttf) и фиксированный размер для новой надписи
+    (по умолчанию `new_font_size=8` pt). Также вставляет текст в прямоугольник, чтобы избежать
+    поворота надписи (иногда появлялся поворот на 90 градусов).
     """
     doc = fitz.open(input_path)
     total = 0
@@ -39,19 +41,34 @@ def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_
                 page.add_redact_annot(inst, fill=(1, 1, 1))
             page.apply_redactions()
 
-            for inst, fontsize, color in infos:
+            for inst, _, color in infos:
                 font_kwargs = {}
                 if font_path and Path(font_path).exists():
                     font_kwargs["fontname"] = Path(font_path).stem
                     font_kwargs["fontfile"] = str(font_path)
 
-                page.insert_text(
-                    (inst.x0, inst.y1 - 1),
-                    new_text,
-                    fontsize=fontsize,
-                    color=color,
-                    **font_kwargs
-                )
+                fs = new_font_size
+
+                # Попытаемся вставить текст внутрь прямоугольника (upright), чтобы избежать поворота.
+                # Если у установленной версии PyMuPDF нет insert_textbox, используется запасной путь.
+                try:
+                    page.insert_textbox(
+                        inst,
+                        new_text,
+                        fontsize=fs,
+                        color=color,
+                        **font_kwargs
+                    )
+                except TypeError:
+                    # fallback: insert_text с явным rotate=0
+                    page.insert_text(
+                        (inst.x0, inst.y1 - 1),
+                        new_text,
+                        fontsize=fs,
+                        color=color,
+                        rotate=0,
+                        **font_kwargs
+                    )
                 total += 1
 
     doc.save(output_path, garbage=4, deflate=True)
@@ -68,13 +85,13 @@ def find_pdfs(folder: Path, suffix: str):
 
 
 if __name__ == "__main__":
-    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result — копия (3)")
+    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result — копия (4)test")
 
     # ==== НАСТРОЙКИ ====
     # Перечисляем нужные варианты через запятую внутри списка []
-    OLD_TEXTS = ["04_3.1", "04_2.1", "05_3.2"]     # что ищем на штампе
-    NEW_TEXT = "03_2.1"                            # на что заменяем
-    SUFFIX = "_renamed"                            # суффикс для новых файлов
+    OLD_TEXTS = ["06.07.26"]     # что ищем на штампе
+    NEW_TEXT = "07.07.26"                            # на что заменяем
+    SUFFIX = "_r"                            # суффикс для новых файлов
 
     # Указываем ваш файл шрифта
     FONT_PATH = "GOST2304A.ttf"
