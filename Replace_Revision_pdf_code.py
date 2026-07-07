@@ -19,18 +19,28 @@ def find_font_info(page, blocks, rect):
     return fontsize, color
 
 
-def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_text: str, font_path: str = None, new_font_size: float = 8) -> int:
+def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_text: str | list | tuple | dict | None = None, font_path: str = None, new_font_size: float = 11) -> int:
     """
-    Заменяет все вхождения нескольких старых строк из списка old_texts на new_text в PDF.
-    Принимает необязательный путь к файлу шрифта (.ttf) и фиксированный размер для новой надписи
-    (по умолчанию `new_font_size=8` pt). Также вставляет текст в прямоугольник, чтобы избежать
-    поворота надписи (иногда появлялся поворот на 90 градусов).
+    Заменяет все вхождения нескольких старых строк из списка old_texts на новые значения в PDF.
+    Поддерживаются варианты:
+    - старый API: old_texts=["XX_X"], new_text="02_3"
+    - новый API: old_texts=[("XX_X.X", "02_3.X"), ("XX_X", "02_3")]
+    - либо old_texts=["XX_X.X", "XX_X"], new_text=["02_3.X", "02_3"]
     """
     doc = fitz.open(input_path)
     total = 0
 
+    if old_texts and all(isinstance(item, (list, tuple)) and len(item) == 2 for item in old_texts):
+        replacements = [(str(old), str(new)) for old, new in old_texts]
+    elif isinstance(new_text, dict):
+        replacements = [(str(old), str(new_text[str(old)])) for old in old_texts]
+    elif isinstance(new_text, (list, tuple)) and not isinstance(new_text, str):
+        replacements = [(str(old), str(new)) for old, new in zip(old_texts, new_text)]
+    else:
+        replacements = [(str(old), str(new_text)) for old in old_texts]
+
     for page in doc:
-        for old_text in old_texts:
+        for old_text, replacement_text in replacements:
             text_instances = page.search_for(old_text)
             if not text_instances:
                 continue
@@ -52,9 +62,13 @@ def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_
 
             for inst, _, color in saved_infos:
                 font_kwargs = {}
-                if font_path and Path(font_path).exists():
-                    font_kwargs["fontname"] = Path(font_path).stem
-                    font_kwargs["fontfile"] = str(font_path)
+                if font_path:
+                    font_path_obj = Path(font_path).expanduser()
+                    if not font_path_obj.is_absolute():
+                        font_path_obj = (Path(__file__).resolve().parent / font_path_obj).resolve()
+                    if font_path_obj.exists():
+                        font_kwargs["fontname"] = font_path_obj.stem
+                        font_kwargs["fontfile"] = str(font_path_obj)
 
                 fs = new_font_size
 
@@ -69,7 +83,7 @@ def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_
 
                 shape.insert_text(
                     p,
-                    new_text,
+                    replacement_text,
                     fontsize=fs,
                     color=color,
                     render_mode=0,
@@ -94,16 +108,22 @@ def find_pdfs(folder: Path, suffix: str):
 
 
 if __name__ == "__main__":
-    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result — копия (test)")
+    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12490-00\03.Result2")
 
     # ==== НАСТРОЙКИ ====
-    # Перечисляем нужные варианты через запятую внутри списка []
-    OLD_TEXTS = ["XX_X"]     # что ищем на штампе
-    NEW_TEXT = "07.07.26"                            # на что заменяем
-    SUFFIX = "_r"                            # суффикс для новых файлов
+    # Здесь задаются замены: сначала то, что ищем в PDF, затем то, на что меняем.
+    # Формат: ("старый_текст", "новый_текст")
+    # Пример:
+    #   ("XX_X.X", "02_3.X")  -> меняем "XX_X.X" на "02_3.X"
+    #   ("XX_X", "02_3")      -> меняем "XX_X" на "02_3"
+    REPLACEMENTS = [
+        ("03.10.23", "07.07.26")
+    ]
+    SUFFIX = "_r"  # суффикс имени выходного PDF-файла
 
     # Указываем ваш файл шрифта
-    FONT_PATH = "GOST2304A.ttf"
+    FONT_PATH = str((Path(__file__).resolve().parent / "GOST2304A.ttf").resolve())
+    NEW_FONT_SIZE = 9
     # ====================
 
     pdf_files = find_pdfs(folder, SUFFIX)
@@ -114,10 +134,10 @@ if __name__ == "__main__":
     for input_path in pdf_files:
         output_path = folder / f"{input_path.stem}{SUFFIX}{input_path.suffix}"
         print(f"Обработка: {input_path.name}")
-        count = replace_text_in_pdf(str(input_path), str(output_path), OLD_TEXTS, NEW_TEXT, font_path=FONT_PATH)
+        count = replace_text_in_pdf(str(input_path), str(output_path), REPLACEMENTS, None, font_path=FONT_PATH, new_font_size=NEW_FONT_SIZE)
         if count:
             print(f"  -> заменено {count} вхождений, сохранено в {output_path.name}")
         else:
-            print(f"  -> Ни один из текстов {OLD_TEXTS} не найден, файл сохранён как копия")
+            print(f"  -> Ни один из текстов {REPLACEMENTS} не найден, файл сохранён как копия")
 
     print("Готово.")
