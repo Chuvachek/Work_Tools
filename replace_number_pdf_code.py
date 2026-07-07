@@ -7,6 +7,7 @@ def find_font_info(page, blocks, rect):
     fontsize = 9
     color = (0, 0, 0)
     for b in blocks:
+        rotation = page.rotation
         for l in b.get("lines", []):
             for s in l.get("spans", []):
                 if fitz.Rect(s["bbox"]).intersects(rect):
@@ -49,29 +50,29 @@ def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_
 
                 fs = new_font_size
 
-                # Попытаемся вставить текст внутрь прямоугольника (upright), чтобы избежать поворота.
-                # Если у установленной версии PyMuPDF нет insert_textbox, используется запасной путь.
-                try:
-                    page.insert_textbox(
-                        inst,
-                        new_text,
-                        fontsize=fs,
-                        color=color,
-                        **font_kwargs
-                    )
-                except TypeError:
-                    # fallback: insert_text с явным rotate=0
-                    page.insert_text(
-                        (inst.x0, inst.y1 - 1),
-                        new_text,
-                        fontsize=fs,
-                        color=color,
-                        rotate=0,
-                        **font_kwargs
-                    )
+                # Координата вставки
+                p = fitz.Point(inst.x0, inst.y1 - 1)
+
+                # Если страница повернута, переводим координаты
+                if page.rotation != 0:
+                    p = p * page.derotation_matrix
+
+                shape = page.new_shape()
+
+                shape.insert_text(
+                    p,
+                    new_text,
+                    fontsize=fs,
+                    color=color,
+                    render_mode=0,
+                    rotate=0,
+                    **font_kwargs
+                )
+
+                shape.commit(overlay=True)
                 total += 1
 
-    doc.save(output_path, garbage=4, deflate=True)
+    doc.save(output_path)
     doc.close()
     return total
 
@@ -85,7 +86,7 @@ def find_pdfs(folder: Path, suffix: str):
 
 
 if __name__ == "__main__":
-    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result — копия (4)test")
+    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result — копия (test)")
 
     # ==== НАСТРОЙКИ ====
     # Перечисляем нужные варианты через запятую внутри списка []
