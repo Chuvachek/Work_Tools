@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 # === Укажите путь к директории с файлами ===
-DIRECTORY = r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12490-00\03.Result2"  # замените на нужный путь
+DIRECTORY = r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12487-00\03.Result"  # замените на нужный путь
 
 def natural_key(filename: str):
     """Естественная сортировка: '2.', '3.', '10.' идут в правильном порядке."""
