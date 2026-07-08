@@ -223,7 +223,7 @@ def find_pdfs(folder: Path, suffix: str):
 
 
 if __name__ == "__main__":
-    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12523-00\03.test")
+    folder = Path(r"C:\Python_project\test")
 
     # ==== НАСТРОЙКИ ====
     # Здесь задаются замены: сначала то, что ищем в PDF, затем то, на что меняем.
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     #   ("XX_X.X", "02_3.X")  -> меняем "XX_X.X" на "02_3.X"
     #   ("XX_X", "02_3")      -> меняем "XX_X" на "02_3"
     REPLACEMENTS = [
-        ("XX_X.X", "01_1.X")
+        ("XX_X.X", "05_1.X")
     ]
     SUFFIX = "_r"  # суффикс имени выходного PDF-файла
 
@@ -258,8 +258,8 @@ if __name__ == "__main__":
         count_seq = replace_sequence_in_pdf(
             input_path=str(output_path),
             output_path=str(output_path),
-            search_text="XX_X.",
-            prefix="01_1",
+            search_text="05_1.X",
+            prefix="05_1",
             start=1,
             font_path=FONT_PATH,
             new_font_size=NEW_FONT_SIZE
