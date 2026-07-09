@@ -19,13 +19,20 @@ def find_font_info(page, blocks, rect):
     return fontsize, color
 
 
-def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_text: str | list | tuple | dict | None = None, font_path: str = None, new_font_size: float = 11) -> int:
+def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_text: str | list | tuple | dict | None = None, font_path: str = None, new_font_size: float = 11, redact_fill=(1, 1, 1)) -> int:
     """
     Заменяет все вхождения нескольких старых строк из списка old_texts на новые значения в PDF.
     Поддерживаются варианты:
     - старый API: old_texts=["XX_X"], new_text="02_3"
     - новый API: old_texts=[("XX_X.X", "02_3.X"), ("XX_X", "02_3")]
     - либо old_texts=["XX_X.X", "XX_X"], new_text=["02_3.X", "02_3"]
+
+    redact_fill: цвет заливки места старого текста после удаления.
+        (1, 1, 1) - закрасить белым (безопасно, если под текстом могут быть
+                     линии/штриховка - гарантированно перекроет их).
+        None      - не закрашивать вообще, просто удалить старый текст и
+                     оставить то, что было под ним (чисто, если там только
+                     белая бумага без пересекающих линий).
     """
     doc = fitz.open(input_path)
     total = 0
@@ -57,7 +64,7 @@ def replace_text_in_pdf(input_path: str, output_path: str, old_texts: list, new_
                 ))
 
             for inst, fontsize, color in infos:
-                page.add_redact_annot(inst, fill=(1, 1, 1))
+                page.add_redact_annot(inst, fill=redact_fill)
             page.apply_redactions()
 
             for inst, _, color in saved_infos:
@@ -105,7 +112,8 @@ def replace_sequence_in_pdf(
     prefix: str = "05_1",
     start: int = 1,
     font_path: str = None,
-    new_font_size: float = 9
+    new_font_size: float = 9,
+    redact_fill=(1, 1, 1)
 ) -> int:
     """
     Последовательно заменяет все вхождения search_text.
@@ -118,6 +126,10 @@ def replace_sequence_in_pdf(
         ...
 
     Порядок соответствует страницам PDF и расположению текста на странице.
+
+    redact_fill: см. описание в replace_text_in_pdf.
+        (1, 1, 1) - закрасить белым (безопасный вариант по умолчанию).
+        None      - не закрашивать, только удалить старый текст.
     """
 
     doc = fitz.open(input_path)
@@ -145,9 +157,9 @@ def replace_sequence_in_pdf(
             fontsize, color = find_font_info(page, blocks, inst)
             infos.append((fitz.Rect(inst), fontsize, color))
 
-        # Закрашиваем старый текст
+        # Закрашиваем (или просто удаляем) старый текст
         for rect, _, _ in infos:
-            page.add_redact_annot(rect, fill=(1, 1, 1))
+            page.add_redact_annot(rect, fill=redact_fill)
 
         page.apply_redactions()
 
@@ -223,18 +235,33 @@ def find_pdfs(folder: Path, suffix: str):
 
 
 if __name__ == "__main__":
-    folder = Path(r"C:\Python_project\test")
+    folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12520-00\03.Result test2")
 
     # ==== НАСТРОЙКИ ====
     # Здесь задаются замены: сначала то, что ищем в PDF, затем то, на что меняем.
     # Формат: ("старый_текст", "новый_текст")
     # Пример:
-    #   ("XX_X.X", "02_3.X")  -> меняем "XX_X.X" на "02_3.X"
-    #   ("XX_X", "02_3")      -> меняем "XX_X" на "02_3"
+    #   ("03.10.23", "07.07.26")  -> заменяет дату штампа
+    # ВАЖНО: сюда НЕ нужно добавлять шаблон нумерации (XX_X.X) —
+    # он обрабатывается отдельно, через SEQUENCE_*, одним проходом,
+    # чтобы не закрашивать одно и то же место дважды.
     REPLACEMENTS = [
-        ("XX_X.X", "05_1.X")
+        # ("03.10.23", "07.07.26"),
     ]
+
+    # Нумерация вида 05_7.1, 05_7.2, 05_7.3 ...
+    SEQUENCE_SEARCH = "XX_X.X"   # шаблон-заглушка, который ищем в исходном PDF
+    SEQUENCE_PREFIX = "05_7"     # префикс для итогового номера
+    SEQUENCE_START = 1           # с какого номера начинать нумерацию
+
     SUFFIX = "_r"  # суффикс имени выходного PDF-файла
+
+    # Заливка места старого текста после его удаления:
+    #   (1, 1, 1) - закрасить белым (надёжно, если под текстом могут быть
+    #                линии рамки/штампа/штриховка - гарантированно их перекроет)
+    #   None      - не закрашивать вообще, только удалить старый текст
+    #                (чисто, если под текстом просто белая бумага без линий)
+    REDACT_FILL = (1, 1, 1)
 
     # Указываем ваш файл шрифта
     FONT_PATH = str((Path(__file__).resolve().parent / "GOST2304A.ttf").resolve())
@@ -249,22 +276,34 @@ if __name__ == "__main__":
     for input_path in pdf_files:
         output_path = folder / f"{input_path.stem}{SUFFIX}{input_path.suffix}"
         print(f"Обработка: {input_path.name}")
-        count = replace_text_in_pdf(str(input_path), str(output_path), REPLACEMENTS, None, font_path=FONT_PATH, new_font_size=NEW_FONT_SIZE)
-        if count:
-            print(f"  -> заменено {count} вхождений, сохранено в {output_path.name}")
-        else:
-            print(f"  -> Ни один из текстов {REPLACEMENTS} не найден, файл сохранён как копия")
 
+        # Шаг 1: простые точечные замены (например, дата), если заданы.
+        if REPLACEMENTS:
+            count = replace_text_in_pdf(str(input_path), str(output_path), REPLACEMENTS, None, font_path=FONT_PATH, new_font_size=NEW_FONT_SIZE, redact_fill=REDACT_FILL)
+            if count:
+                print(f"  -> заменено {count} вхождений, сохранено в {output_path.name}")
+            else:
+                print(f"  -> Ни один из текстов {REPLACEMENTS} не найден, файл сохранён как копия")
+            seq_input = str(output_path)
+        else:
+            seq_input = str(input_path)
+
+        # Шаг 2: нумерация — ОДИН проход по оригинальному шаблону XX_X.X,
+        # сразу пишем финальный номер (05_7.1, 05_7.2, ...) без промежуточной
+        # закраски, чтобы под текстом не накапливались лишние белые прямоугольники.
         count_seq = replace_sequence_in_pdf(
-            input_path=str(output_path),
+            input_path=seq_input,
             output_path=str(output_path),
-            search_text="05_1.X",
-            prefix="05_1",
-            start=1,
+            search_text=SEQUENCE_SEARCH,
+            prefix=SEQUENCE_PREFIX,
+            start=SEQUENCE_START,
             font_path=FONT_PATH,
-            new_font_size=NEW_FONT_SIZE
+            new_font_size=NEW_FONT_SIZE,
+            redact_fill=REDACT_FILL
         )
         if count_seq:
-            print(f"  -> последовательная замена {count_seq} вхождений выполнена")
+            print(f"  -> последовательная нумерация: {count_seq} вхождений ({SEQUENCE_PREFIX}.{SEQUENCE_START}...)")
+        else:
+            print(f"  -> шаблон '{SEQUENCE_SEARCH}' для нумерации не найден")
 
     print("Готово.")
