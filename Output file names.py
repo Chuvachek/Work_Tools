@@ -2,25 +2,25 @@ import re
 from pathlib import Path
 
 # === Укажите путь к директории с файлами ===
-DIRECTORY = r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12487-00\03.Result"  # замените на нужный путь
+DIRECTORY = r"C:\Users\I8741~1.DAN\Desktop\В работе\вахта 3\TQ-12477-00\01.Info\DXF"  # замените на нужный путь
+
+EXTENSIONS = {".dxf"}  # расширения файлов, которые нужно взять из директории
 
 def natural_key(filename: str):
-    """Естественная сортировка: '2.', '3.', '10.' идут в правильном порядке."""
-    match = re.match(r'^(\d+)\.', filename)
-    return int(match.group(1)) if match else float('inf')
+    """Естественная сортировка по сегментам текста и числам."""
+    return [int(token) if token.isdigit() else token.lower() for token in re.split(r'(\d+)', filename)]
 
-def get_pdf_filenames(directory: str):
+def get_filenames(directory: str, extensions: set[str] = EXTENSIONS):
     path = Path(directory)
     if not path.is_dir():
         raise NotADirectoryError(f"Директория не найдена: {directory}")
 
-    # только файлы в самой папке (без подпапок), только .pdf
-    files = [f.name for f in path.iterdir() if f.is_file() and f.suffix.lower() == ".pdf"]
+    files = [f.name for f in path.iterdir() if f.is_file() and f.suffix.lower() in extensions]
     files.sort(key=natural_key)
     return files
 
 if __name__ == "__main__":
-    names = get_pdf_filenames(DIRECTORY)
+    names = get_filenames(DIRECTORY)
 
     print(f"Найдено файлов: {len(names)}\n")
     for name in names:

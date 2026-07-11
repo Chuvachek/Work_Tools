@@ -131,7 +131,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         folder = Path(sys.argv[1])
     else:
-        folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12520-00\03.Result\Recolor")
+        folder = Path(r"C:\Users\i.danilov\Desktop\В работе\вахта 3\TQ-12488-00\03.Result — копия (6)")
 
     pdf_files = find_pdfs(folder)
     if not pdf_files:
